@@ -80,7 +80,7 @@ Tables with SCD Type 2 (history versioning):
 const current = await db.query.staff.findFirst({
   where: and(
     eq(staff.id, staffId),
-    eq(staff.isCurrent, true)
+    eq(staff.is_current, true)
   ),
 });
 
@@ -93,10 +93,10 @@ const staffAtDate = await db
   .from(staff)
   .where(
     and(
-      lte(staff.validFrom, specificDate),
+      lte(staff.valid_from, specificDate),
       or(
-        isNull(staff.validTo),
-        gte(staff.validTo, specificDate)
+        isNull(staff.valid_to),
+        gte(staff.valid_to, specificDate)
       )
     )
   );
@@ -274,16 +274,16 @@ type StaffRow = typeof staff.$inferSelect;
 - Use transactions for multi-table operations
 - Query only current versions of SCD tables unless specifically requesting history
 - Use Drizzle's relational queries with `with` for eager loading
-- Include organizationId in all queries for multi-tenancy
-- Handle nullable SCD fields (`validTo`, `previousVersionId`)
+- Include organization_id in all queries for multi-tenancy
+- Handle nullable SCD fields (`valid_to`, `previous_version_id`)
 
 ### ❌ DON'T
 
 - Don't use direct `db.insert/update/delete` without audit logging
-- Don't query SCD tables without filtering for `isCurrent = true`
+- Don't query SCD tables without filtering for `is_current = true`
 - Don't forget to set SCD fields when creating new versions
 - Don't expose internal IDs in API responses without authorization checks
-- Don't skip the organizationId filter - this breaks multi-tenancy
+- Don't skip the organization_id filter - this breaks multi-tenancy
 - Don't hardcode role names - they are organization-specific
 - Don't forget that `updateAssignmentStatus` already creates audit logs
 
@@ -297,11 +297,11 @@ import { createWithAudit } from './helpers/audit-logger';
 const newStaff = await createWithAudit({
   table: staff,
   values: {
-    organizationId: org.id,
+    organization_id: org.id,
     name: 'John Doe',
     email: 'john@example.com',
     phone: '+1234567890',
-    primaryRoleId: roleId,
+    primary_role_id: roleId,
   },
   entityType: 'staff',
   performedBy: userId,
@@ -335,9 +335,9 @@ const updated = await createNewVersion({
 // ALWAYS filter by organization
 const orgStaff = await db.query.staff.findMany({
   where: and(
-    eq(staff.organizationId, currentOrgId),
-    eq(staff.isCurrent, true),
-    eq(staff.isActive, true)
+    eq(staff.organization_id, currentOrgId),
+    eq(staff.is_current, true),
+    eq(staff.is_active, true)
   ),
   with: {
     primaryRole: true,
@@ -355,12 +355,12 @@ const orgStaff = await db.query.staff.findMany({
 const shift = await createWithAudit({
   table: shifts,
   values: {
-    organizationId: org.id,
-    createdBy: userId,
+    organization_id: org.id,
+    created_by: userId,
     title: 'Friday Night Service',
-    shiftDate: new Date('2025-11-07'),
-    startTime: new Date('2025-11-07T17:00:00'),
-    endTime: new Date('2025-11-07T23:00:00'),
+    shift_date: new Date('2025-11-07'),
+    start_time: new Date('2025-11-07T17:00:00'),
+    end_time: new Date('2025-11-07T23:00:00'),
     status: 'published',
   },
   entityType: 'shift',
@@ -369,8 +369,8 @@ const shift = await createWithAudit({
 
 // 2. Assign staff
 await db.insert(shiftAssignments).values([
-  { shiftId: shift.id, staffId: staff1.id, roleId: role1.id },
-  { shiftId: shift.id, staffId: staff2.id, roleId: role2.id },
+  { shift_id: shift.id, staff_id: staff1.id, role_id: role1.id },
+  { shift_id: shift.id, staff_id: staff2.id, role_id: role2.id },
 ]);
 
 // 3. Staff responds (creates BOTH logs automatically)

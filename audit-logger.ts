@@ -42,7 +42,7 @@ export async function createNewVersion<T extends Record<string, any>>({
   return await db.transaction(async (tx) => {
     // 1. Hole aktuelle Version
     const current = await tx.query[table._.name].findFirst({
-      where: and(eq(table.id, currentId), eq(table.isCurrent, true)),
+      where: and(eq(table.id, currentId), eq(table.is_current, true)),
     });
 
     if (!current) {
@@ -55,9 +55,9 @@ export async function createNewVersion<T extends Record<string, any>>({
     await tx
       .update(table)
       .set({
-        validTo: now,
-        isCurrent: false,
-        updatedAt: now,
+        valid_to: now,
+        is_current: false,
+        updated_at: now,
       })
       .where(eq(table.id, currentId));
 
@@ -68,12 +68,12 @@ export async function createNewVersion<T extends Record<string, any>>({
         ...current,
         ...updates,
         id: undefined, // Neue UUID wird generiert
-        previousVersionId: currentId,
-        validFrom: now,
-        validTo: null,
-        isCurrent: true,
-        createdAt: current.createdAt, // Behalte ursprüngliches Erstellungsdatum
-        updatedAt: now,
+        previous_version_id: currentId,
+        valid_from: now,
+        valid_to: null,
+        is_current: true,
+        created_at: current.created_at, // Behalte ursprüngliches Erstellungsdatum
+        updated_at: now,
       })
       .returning();
 
@@ -88,17 +88,17 @@ export async function createNewVersion<T extends Record<string, any>>({
     });
 
     await tx.insert(auditLogs).values({
-      organizationId: current.organizationId || null,
-      entityType: getEntityType(table._.name),
-      entityId: newVersion.id,
+      organization_id: current.organization_id || null,
+      entity_type: getEntityType(table._.name),
+      entity_id: newVersion.id,
       action: 'update',
-      performedBy,
-      performedByStaff,
-      oldValues,
-      newValues,
-      changedFields,
-      ipAddress,
-      userAgent,
+      performed_by: performedBy,
+      performed_by_staff: performedByStaff,
+      old_values: oldValues,
+      new_values: newValues,
+      changed_fields: changedFields,
+      ip_address: ipAddress,
+      user_agent: userAgent,
       metadata,
     });
 
@@ -130,11 +130,11 @@ export async function getEntityHistory({
     versions.push(version);
 
     // Gehe zur nächsten historischen Version
-    currentId = version.previousVersionId;
+    currentId = version.previous_version_id;
   }
 
-  return versions.sort((a, b) => 
-    new Date(b.validFrom).getTime() - new Date(a.validFrom).getTime()
+  return versions.sort((a, b) =>
+    new Date(b.valid_from).getTime() - new Date(a.valid_from).getTime()
   );
 }
 
@@ -159,14 +159,14 @@ export async function getCurrentVersion({
 
     if (!version) break;
 
-    if (version.isCurrent) {
+    if (version.is_current) {
       current = version;
       break;
     }
 
     // Suche nach Versionen, die auf diese referenzieren
     const newer = await db.query[table._.name].findFirst({
-      where: eq(table.previousVersionId, currentId),
+      where: eq(table.previous_version_id, currentId),
     });
 
     if (!newer) {
@@ -194,8 +194,8 @@ export async function updateStaffAddress({
   addressId: string;
   updates: {
     street?: string;
-    houseNumber?: string;
-    postalCode?: string;
+    house_number?: string;
+    postal_code?: string;
     city?: string;
     state?: string;
     country?: string;
@@ -251,17 +251,17 @@ export async function logAuditEvent({
   metadata?: Record<string, any>;
 }) {
   return await db.insert(auditLogs).values({
-    organizationId,
-    entityType,
-    entityId,
+    organization_id: organizationId,
+    entity_type: entityType,
+    entity_id: entityId,
     action,
-    performedBy,
-    performedByStaff,
-    oldValues,
-    newValues,
-    changedFields,
-    ipAddress,
-    userAgent,
+    performed_by: performedBy,
+    performed_by_staff: performedByStaff,
+    old_values: oldValues,
+    new_values: newValues,
+    changed_fields: changedFields,
+    ip_address: ipAddress,
+    user_agent: userAgent,
     metadata,
   });
 }
@@ -292,15 +292,15 @@ export async function createWithAudit<T extends Record<string, any>>({
     const [created] = await tx.insert(table).values(values).returning();
 
     await tx.insert(auditLogs).values({
-      organizationId: created.organizationId || null,
-      entityType,
-      entityId: created.id,
+      organization_id: created.organization_id || null,
+      entity_type: entityType,
+      entity_id: created.id,
       action: 'create',
-      performedBy,
-      performedByStaff,
-      newValues: created,
-      ipAddress,
-      userAgent,
+      performed_by: performedBy,
+      performed_by_staff: performedByStaff,
+      new_values: created,
+      ip_address: ipAddress,
+      user_agent: userAgent,
       metadata,
     });
 
@@ -345,7 +345,7 @@ export async function updateWithAudit<T extends Record<string, any>>({
     // Update ausführen
     const [updated] = await tx
       .update(table)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...updates, updated_at: new Date() })
       .where(eq(table.id, id))
       .returning();
 
@@ -361,17 +361,17 @@ export async function updateWithAudit<T extends Record<string, any>>({
 
     // Log erstellen
     await tx.insert(auditLogs).values({
-      organizationId: updated.organizationId || null,
-      entityType,
-      entityId: id,
+      organization_id: updated.organization_id || null,
+      entity_type: entityType,
+      entity_id: id,
       action: 'update',
-      performedBy,
-      performedByStaff,
-      oldValues,
-      newValues,
-      changedFields,
-      ipAddress,
-      userAgent,
+      performed_by: performedBy,
+      performed_by_staff: performedByStaff,
+      old_values: oldValues,
+      new_values: newValues,
+      changed_fields: changedFields,
+      ip_address: ipAddress,
+      user_agent: userAgent,
       metadata,
     });
 
@@ -413,15 +413,15 @@ export async function deleteWithAudit({
 
     // Log erstellen VOR dem Löschen
     await tx.insert(auditLogs).values({
-      organizationId: record.organizationId || null,
-      entityType,
-      entityId: id,
+      organization_id: record.organization_id || null,
+      entity_type: entityType,
+      entity_id: id,
       action: 'delete',
-      performedBy,
-      performedByStaff,
-      oldValues: record,
-      ipAddress,
-      userAgent,
+      performed_by: performedBy,
+      performed_by_staff: performedByStaff,
+      old_values: record,
+      ip_address: ipAddress,
+      user_agent: userAgent,
       metadata,
     });
 
@@ -446,10 +446,10 @@ export async function getAuditLogsForEntity({
 }) {
   return await db.query.auditLogs.findMany({
     where: and(
-      eq(auditLogs.entityType, entityType),
-      eq(auditLogs.entityId, entityId)
+      eq(auditLogs.entity_type, entityType),
+      eq(auditLogs.entity_id, entityId)
     ),
-    orderBy: (logs, { desc }) => [desc(logs.createdAt)],
+    orderBy: (logs, { desc }) => [desc(logs.created_at)],
     limit,
     with: {
       performedByUser: {
@@ -488,10 +488,10 @@ export async function getOrganizationAuditLogs({
   action?: 'create' | 'update' | 'delete' | 'status_change';
   limit?: number;
 }) {
-  const conditions = [eq(auditLogs.organizationId, organizationId)];
+  const conditions = [eq(auditLogs.organization_id, organizationId)];
 
   if (entityType) {
-    conditions.push(eq(auditLogs.entityType, entityType));
+    conditions.push(eq(auditLogs.entity_type, entityType));
   }
 
   if (action) {
@@ -500,7 +500,7 @@ export async function getOrganizationAuditLogs({
 
   return await db.query.auditLogs.findMany({
     where: and(...conditions),
-    orderBy: (logs, { desc }) => [desc(logs.createdAt)],
+    orderBy: (logs, { desc }) => [desc(logs.created_at)],
     limit,
     with: {
       performedByUser: true,
@@ -544,7 +544,7 @@ export async function updateAssignmentStatus({
     throw new Error('Assignment not found');
   }
 
-  const previousStatus = currentAssignment.responseStatus;
+  const previousStatus = currentAssignment.response_status;
 
   // Nur updaten wenn sich der Status tatsächlich ändert
   if (previousStatus === newStatus) {
@@ -557,38 +557,38 @@ export async function updateAssignmentStatus({
     const [updatedAssignment] = await tx
       .update(shiftAssignments)
       .set({
-        responseStatus: newStatus,
-        responseMessage: message,
-        respondedAt: new Date(),
-        updatedAt: new Date(),
+        response_status: newStatus,
+        response_message: message,
+        responded_at: new Date(),
+        updated_at: new Date(),
       })
       .where(eq(shiftAssignments.id, assignmentId))
       .returning();
 
     // 2. Erstelle Assignment-spezifischen Log-Eintrag
     await tx.insert(shiftAssignmentLogs).values({
-      assignmentId,
-      previousStatus,
-      newStatus,
-      changedBy,
-      changedByStaff,
+      assignment_id: assignmentId,
+      previous_status: previousStatus,
+      new_status: newStatus,
+      changed_by: changedBy,
+      changed_by_staff: changedByStaff,
       message,
       metadata,
     });
 
     // 3. Erstelle universellen Audit-Log-Eintrag
     await tx.insert(auditLogs).values({
-      organizationId: null, // Wird über shift ermittelt wenn nötig
-      entityType: 'shift_assignment',
-      entityId: assignmentId,
+      organization_id: null, // Wird über shift ermittelt wenn nötig
+      entity_type: 'shift_assignment',
+      entity_id: assignmentId,
       action: 'status_change',
-      performedBy: changedBy,
-      performedByStaff: changedByStaff,
-      oldValues: { responseStatus: previousStatus },
-      newValues: { responseStatus: newStatus },
-      changedFields: ['responseStatus'],
-      ipAddress,
-      userAgent,
+      performed_by: changedBy,
+      performed_by_staff: changedByStaff,
+      old_values: { response_status: previousStatus },
+      new_values: { response_status: newStatus },
+      changed_fields: ['response_status'],
+      ip_address: ipAddress,
+      user_agent: userAgent,
       metadata,
     });
 
@@ -601,8 +601,8 @@ export async function updateAssignmentStatus({
  */
 export async function getAssignmentHistory(assignmentId: string) {
   return await db.query.shiftAssignmentLogs.findMany({
-    where: eq(shiftAssignmentLogs.assignmentId, assignmentId),
-    orderBy: (logs, { desc }) => [desc(logs.createdAt)],
+    where: eq(shiftAssignmentLogs.assignment_id, assignmentId),
+    orderBy: (logs, { desc }) => [desc(logs.created_at)],
     with: {
       changedByUser: {
         columns: {
@@ -627,9 +627,9 @@ export async function getAssignmentHistory(assignmentId: string) {
  */
 export async function getAssignmentStatistics(shiftId: string) {
   const logs = await db.query.shiftAssignmentLogs.findMany({
-    where: (logs, { eq, and }) => 
+    where: (logs, { eq, and }) =>
       and(
-        eq(logs.assignmentId, shiftId)
+        eq(logs.assignment_id, shiftId)
       ),
     with: {
       assignment: true,
@@ -637,10 +637,10 @@ export async function getAssignmentStatistics(shiftId: string) {
   });
 
   // Berechne Statistiken
-  const acceptedCount = logs.filter((log) => log.newStatus === 'accepted').length;
-  const declinedCount = logs.filter((log) => log.newStatus === 'declined').length;
-  const changedByManagerCount = logs.filter((log) => log.changedBy !== null).length;
-  const changedByStaffCount = logs.filter((log) => log.changedByStaff !== null).length;
+  const acceptedCount = logs.filter((log) => log.new_status === 'accepted').length;
+  const declinedCount = logs.filter((log) => log.new_status === 'declined').length;
+  const changedByManagerCount = logs.filter((log) => log.changed_by !== null).length;
+  const changedByStaffCount = logs.filter((log) => log.changed_by_staff !== null).length;
 
   return {
     totalChanges: logs.length,
@@ -665,14 +665,14 @@ export function formatAssignmentHistory(
       ? `Staff ${log.changedByStaffMember.name}`
       : 'System';
 
-    const statusChange = log.previousStatus
-      ? `${log.previousStatus} → ${log.newStatus}`
-      : `Status gesetzt: ${log.newStatus}`;
+    const statusChange = log.previous_status
+      ? `${log.previous_status} → ${log.new_status}`
+      : `Status gesetzt: ${log.new_status}`;
 
-    const timestamp = new Date(log.createdAt).toLocaleString('de-DE');
+    const timestamp = new Date(log.created_at).toLocaleString('de-DE');
 
     let line = `[${timestamp}] ${actor}: ${statusChange}`;
-    
+
     if (log.message) {
       line += ` - "${log.message}"`;
     }
